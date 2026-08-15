@@ -2,6 +2,8 @@
 
 > **SolarSense Backend** is an Express.js & Socket.IO server powering the SolarSense platform. It hosts a shared **Server-Side Digital Twin Engine**, real-time IoT physical calculations, WebSocket event broadcasting, and Groq LLM integration.
 
+### 🌐 Deployed API: [https://solar-sense-backend-8rsi.onrender.com](https://solar-sense-backend-8rsi.onrender.com/api/health)
+
 ---
 
 ## ✨ Features & Subsystems
