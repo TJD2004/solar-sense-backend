@@ -13,6 +13,7 @@ import analyticsRoutes from "./routes/analytics.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
 import forecastRoutes from "./routes/forecast.routes.js";
 import simulatorRoutes from "./routes/simulator.routes.js";
+import mlRoutes from "./routes/ml.routes.js";
 
 const PORT = process.env.PORT || 4000;
 const rawCors = process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:5174";
@@ -29,6 +30,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/forecast", forecastRoutes);
 app.use("/api/simulator", simulatorRoutes);
+app.use("/api/ml", mlRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
