@@ -109,7 +109,17 @@ class DigitalTwin extends EventEmitter {
   // long as it's selected.
   getAnomalyState() {
     const transientBlip = this.scenarioId === "normal" && this.tick > 0 && this.tick % 9 === 0;
-    const anomalyActive = this.scenarioId !== "normal" || transientBlip;
+    const isExtremeTemp = (this.overrides?.temp >= 40) || (this.live?.panelTemp >= 45) || (this.live?.ambientTemp >= 40);
+    const isCloudyOrRain = (this.overrides?.cloudCoverage >= 60) || (this.overrides?.weather === "cloudy") || (this.overrides?.weather === "rainy");
+    const isShadingOrSoiling = (this.overrides?.shading >= 30) || (this.overrides?.soiling >= 30);
+
+    const anomalyActive =
+      this.scenarioId !== "normal" ||
+      transientBlip ||
+      isExtremeTemp ||
+      isCloudyOrRain ||
+      isShadingOrSoiling;
+
     return { transientBlip, anomalyActive };
   }
 
