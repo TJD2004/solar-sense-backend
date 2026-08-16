@@ -16,11 +16,12 @@ async function persistInsight(doc) {
 // POST /api/ai/analyze
 // Explains *why* today's production deviates from expected (spec §5).
 export async function analyze(req, res) {
+  const { lang } = req.body || {};
   const scenario = twin.getScenarioDef();
   const curve = twin.getCurve();
   const healthScore = twin.getHealth();
 
-  const result = await analyzePerformance({ scenario, healthScore, curve });
+  const result = await analyzePerformance({ scenario, healthScore, curve, lang });
 
   persistInsight({
     type: "performance",
@@ -34,9 +35,9 @@ export async function analyze(req, res) {
   res.json(result);
 }
 
-// POST /api/ai/chat  { message }
+// POST /api/ai/chat  { message, lang }
 export async function chat(req, res) {
-  const { message } = req.body || {};
+  const { message, lang } = req.body || {};
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "Request body must include a non-empty string `message`." });
   }
@@ -48,7 +49,7 @@ export async function chat(req, res) {
     healthScore: twin.getHealth(),
   };
 
-  const result = await chatWithCopilot({ message, ctx, recommendWindow });
+  const result = await chatWithCopilot({ message, ctx, recommendWindow, lang });
 
   persistInsight({
     type: "chat",
@@ -59,16 +60,16 @@ export async function chat(req, res) {
   res.json(result);
 }
 
-// POST /api/ai/schedule  { name, powerKW, durationHours }
+// POST /api/ai/schedule  { name, powerKW, durationHours, lang }
 export async function schedule(req, res) {
-  const { name, powerKW, durationHours } = req.body || {};
+  const { name, powerKW, durationHours, lang } = req.body || {};
   if (!name || !powerKW || !durationHours) {
     return res.status(400).json({ error: "Request body must include `name`, `powerKW`, and `durationHours`." });
   }
 
   const curve = twin.getCurve();
   const rec = recommendWindow(curve, Number(durationHours), Number(powerKW));
-  const result = await explainSchedule({ appliance: { name, powerKW, durationHours }, rec });
+  const result = await explainSchedule({ appliance: { name, powerKW, durationHours }, rec, lang });
 
   persistInsight({
     type: "schedule",
