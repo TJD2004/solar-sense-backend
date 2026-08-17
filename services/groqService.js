@@ -171,12 +171,95 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
   const isMr = lang === "mr";
 
   const heuristicReply = (() => {
-    if ((m.includes("month") || m.includes("महीना") || m.includes("महिना")) && (m.includes("produce") || m.includes("generat") || m.includes("उत्पादन") || m.includes("निर्मिती"))) {
-      if (isHi) return `आपने इस महीने अब तक ${monthly.monthGeneratedKWh} kWh बिजली का उत्पादन किया है।`;
-      if (isMr) return `तुम्ही या महिन्यात आतापर्यंत ${monthly.monthGeneratedKWh} kWh वीज निर्माण केली आहे.`;
-      return `You've generated ${monthly.monthGeneratedKWh} kWh this month so far.`;
+    // 1. Table / Schedule
+    if (m.includes("table") || m.includes("breakdown") || m.includes("appliance") || m.includes("schedule") || 
+        m.includes("सारणी") || m.includes("सूची") || m.includes("वेळापत्रक")) {
+      if (isHi) {
+        return `यहाँ आपकी अनुशंसित सौर उपकरण शेड्यूलिंग तालिका है:
+
+| उपकरण | अनुशंसित समय | बचाई गई ग्रिड राशि | स्थिति |
+| :--- | :--- | :--- | :--- |
+| वाशिंग मशीन | 10:00 - 11:30 | ₹42.50 | अनुशंसित |
+| ईवी फास्ट चार्जर | 11:30 - 14:00 | ₹128.00 | पीक सोलर |
+| वॉटर हीटर पंप | 14:00 - 15:00 | ₹34.00 | निर्धारित |`;
+      }
+      if (isMr) {
+        return `येथे तुमचे शिफारस केलेले सौर उपकरण वेळापत्रक आहे:
+
+| उपकरण | शिफारस केलेली वेळ | वाचवलेले पैसे | स्थिती |
+| :--- | :--- | :--- | :--- |
+| वॉशिंग मशीन | 10:00 - 11:30 | ₹42.50 | शिफारस केलेले |
+| ईव्ही फास्ट चार्जर | 11:30 - 14:00 | ₹128.00 | उच्च सूर्याचे तास |
+| वॉटर हीटर पंप | 14:00 - 15:00 | ₹34.00 | वेळापत्रकात समाविष्ट |`;
+      }
+      return `Here is your recommended solar appliance scheduling matrix:
+
+| Appliance | Recommended Window | Grid Tariff Saved | Status |
+| :--- | :--- | :--- | :--- |
+| Washing Machine | 10:00 - 11:30 | ₹42.50 | Recommended |
+| EV Fast Charger | 11:30 - 14:00 | ₹128.00 | Peak Solar |
+| Water Heater Pump | 14:00 - 15:00 | ₹34.00 | Scheduled |`;
     }
-    if (m.includes("yesterday") || m.includes("bad") || m.includes("wrong") || m.includes("why") || m.includes("कल") || m.includes("काल") || m.includes("खराब") || m.includes("का") || m.includes("क्यों")) {
+
+    // 2. Battery / Storage
+    if (m.includes("battery") || m.includes("storage") || m.includes("charge") || 
+        m.includes("बैटरी") || m.includes("बॅटरी") || m.includes("भंडारण") || m.includes("साठवण")) {
+      if (isHi) {
+        return "सौर बैटरी का जीवनकाल और प्रदर्शन बढ़ाने के लिए:\n\n1. **सर्वोत्तम चार्जिंग**: बैटरी को चरम सौर उत्पादन घंटों (**11:00 - 14:00**) के दौरान चार्ज करें।\n2. **डिस्चार्ज की सीमा (DoD)**: अपनी बैटरी को **20% से 80%** के बीच रखें, इससे बैटरी का जीवन दोगुना हो जाएगा।\n3. **पीक टैरिफ डिस्चार्ज**: महंगे ग्रिड टैरिफ से बचने के लिए शाम के पीक घंटों (**18:00 - 21:00**) में संचित ऊर्जा का उपयोग करें।";
+      }
+      if (isMr) {
+        return "सौर बॅटरीचे आयुष्य आणि कामगिरी वाढवण्यासाठी:\n\n1. **सर्वोत्तम चार्जिंग**: बॅटरी पीक सौर निर्मिती तासांमध्ये (**11:00 - 14:00**) चार्ज करा।\n2. **डिस्चार्जची खोली (DoD)**: बॅटरीची चार्ज पातळी **20% ते 80%** दरम्यान ठेवा, यामुळे बॅटरीचे एकूण आयुष्य दुप्पट होईल।\n3. **पीक डिस्चार्ज**: महाग ग्रिड दर टाळण्यासाठी संध्याकाळच्या पीक वेळेत (**18:00 - 21:00**) साठवलेली वीज वापरा।";
+      }
+      return "To maximize your solar battery lifespan and performance:\n\n1. **Optimal Charging**: Charge your battery during peak solar production hours (**11:00 - 14:00**) when generation exceeds household load.\n2. **Depth of Discharge (DoD)**: Maintain your battery state of charge between **20% and 80%** to double its total cycle life.\n3. **Peak Tariff Discharge**: Discharge stored battery energy during evening peak hours (**18:00 - 21:00**) to avoid expensive grid tariffs.";
+    }
+
+    // 3. EV Charging
+    if (m.includes("ev") || m.includes("car") || m.includes("गाड़ी") || m.includes("गाडी") || m.includes("वाहन")) {
+      const rec = recommendWindow(curve, 2, 3.3);
+      if (isHi) {
+        return `आपकी इलेक्ट्रिक गाड़ी को चार्ज करने का सर्वोत्तम समय आज **${rec.window}** है। इस समय चार्ज करने से आप सीधे अतिरिक्त सौर उत्पादन का उपयोग करेंगे, जिससे लगभग **${rec.reductionKWh} kWh** ग्रिड बिजली की बचत होगी।`;
+      }
+      if (isMr) {
+        return `आज तुमचे इलेक्ट्रिक वाहन चार्ज करण्याची सर्वोत्तम वेळ **${rec.window}** आहे। यादरम्यान चार्ज केल्याने थेट अतिरिक्त सौर ऊर्जेचा वापर होईल, ज्यामुळे महावितरणच्या विजेवरील अवलंबित्व सुमारे **${rec.reductionKWh} kWh** कमी होईल।`;
+      }
+      return `The optimal solar window to charge your Electric Vehicle today is **${rec.window}**. Charging during this period utilizes direct excess solar yield, cutting approximately **${rec.reductionKWh} kWh** of expensive grid draw.`;
+    }
+
+    // 4. AC Usage
+    if (m.includes("ac") || m.includes("air cond") || m.includes("एसी") || m.includes("कूलर")) {
+      const rec = recommendWindow(curve, 3, 2.0);
+      if (isHi) {
+        return `एसी चलाने का सर्वोत्तम समय आज **${rec.window}** है, जब धूप सबसे तेज होती है और पर्याप्त सौर ऊर्जा उपलब्ध होती है। इस समय एसी चलाने से आप लगभग **${rec.reductionKWh} kWh** ग्रिड बिजली बचाएंगे।`;
+      }
+      if (isMr) {
+        return `एसी वापरण्याची सर्वोत्तम वेळ आज **${rec.window}** आहे, जेव्हा सूर्यप्रकाश जास्त असतो आणि मुबलक वीज उपलब्ध असते। यादरम्यान वापर केल्यास सुमारे **${rec.reductionKWh} kWh** विजेची बचत होईल।`;
+      }
+      return `The best window to run your Air Conditioner today is **${rec.window}** when solar production is at peak, saving approximately **${rec.reductionKWh} kWh** of grid draw.`;
+    }
+
+    // 5. Monthly Generation & Savings
+    if (m.includes("month") || m.includes("save") || m.includes("saving") || m.includes("money") || m.includes("bill") ||
+        m.includes("महीना") || m.includes("महिना") || m.includes("बचत") || m.includes("पैसे") || m.includes("बिल")) {
+      if (isHi) {
+        return `आपने इस महीने अब तक **${monthly.monthGeneratedKWh} kWh** सौर ऊर्जा का उत्पादन किया है, जिससे कुल **₹${monthly.savings.toLocaleString("en-IN")}** की बचत हुई है!`;
+      }
+      if (isMr) {
+        return `तुम्ही या महिन्यात आतापर्यंत **${monthly.monthGeneratedKWh} kWh** सौर ऊर्जेची निर्मिती केली आहे, ज्यामुळे **₹${monthly.savings.toLocaleString("en-IN")}** ची बचत झाली आहे!`;
+      }
+      return `So far this month, your solar system has generated **${monthly.monthGeneratedKWh} kWh**, saving you **₹${monthly.savings.toLocaleString("en-IN")}** on your electricity bill and avoiding **${monthly.co2AvoidedKg} kg** of CO₂ emissions.`;
+    }
+
+    // 6. Panel Maintenance & Cleaning
+    if (m.includes("clean") || m.includes("dust") || m.includes("soiling") || m.includes("maintenance") ||
+        m.includes("साफ") || m.includes("सफाई") || m.includes("धूल")) {
+      if (isHi) return "धूल और गंदगी सौर अवशोषण को 12% से 25% तक कम कर सकती है। हम आपके सौर पैनलों को हर 3 से 4 सप्ताह में एक बार सुबह जल्दी साफ पानी और एक नरम निचोड़ के साथ साफ करने की सलाह देते हैं।";
+      if (isMr) return "धूळ आणि घाण सौर शोषण १२% ते २५% कमी करू शकतात। आम्ही शिफारस करतो की तुम्ही तुमच्या सौर पॅनेल्सची स्वच्छता दर ३ ते ४ आठवड्यांनी एकदा सकाळी लवकर स्वच्छ पाणी आणि मऊ कापडाने करावी।";
+      return "Dust, bird droppings, and soiling can reduce solar absorption by 12% to 25%. We recommend cleaning your solar panels with clean water and a soft squeegee once every 3 to 4 weeks early in the morning before panels get hot.";
+    }
+
+    // 7. Yesterday/Anomalies
+    if (m.includes("yesterday") || m.includes("bad") || m.includes("wrong") || m.includes("why") || 
+        m.includes("कल") || m.includes("काल") || m.includes("खराब") || m.includes("का") || m.includes("क्यों") || m.includes("काय")) {
       if (scenario.id === "normal") {
         if (isHi) return "कल उत्पादन अपेक्षित वक्र के करीब था — कोई गिरावट नहीं देखी गई।";
         if (isMr) return "काल निर्मिती अपेक्षित वक्राच्या जवळ होती — कोणतीही घट आढळली नाही।";
@@ -186,22 +269,24 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
       if (isMr) return INSIGHT_TRANSLATIONS.mr[scenario.id]?.body || scenario.insight.body;
       return scenario.insight.body;
     }
-    if (m.includes("wash") || m.includes("run") || m.includes("now") || m.includes("should i") || m.includes("कपड़े") || m.includes("चला") || m.includes("कपडे") || m.includes("चालू")) {
+
+    // 8. General Appliance Wash/Run Queries
+    if (m.includes("wash") || m.includes("run") || m.includes("now") || m.includes("should i") || 
+        m.includes("कपड़े") || m.includes("चला") || m.includes("कपडे") || m.includes("चालू")) {
       const rec = recommendWindow(curve, 1, 1.2);
       if (isHi) return `आज सबसे अच्छा सौर समय ${rec.window} है — उस समय ~1.2 kW उपकरण चलाने से ग्रिड से लगभग ${rec.reductionKWh} kWh की खपत कम होगी।`;
       if (isMr) return `आजची सर्वोत्तम सौर वेळ ${rec.window} आहे — त्या वेळी ~1.2 kW उपकरणे चालवल्यास ग्रिडवरील वापर सुमारे ${rec.reductionKWh} kWh कमी होईल।`;
       return `The best solar window today is ${rec.window} — running a ~1.2 kW appliance then would cut roughly ${rec.reductionKWh} kWh of grid draw.`;
     }
-    if (m.includes("save") || m.includes("saving") || m.includes("money") || m.includes("बचत") || m.includes("पैसे")) {
-      if (isHi) return `आपने इस महीने अब तक ${monthly.monthGeneratedKWh} kWh के सौर उत्पादन से ₹${monthly.savings.toLocaleString("en-IN")} बचाए हैं।`;
-      if (isMr) return `तुम्ही या महिन्यात आतापर्यंत ${monthly.monthGeneratedKWh} kWh च्या सौर निर्मितीमधून ₹${monthly.savings.toLocaleString("en-IN")} वाचवले आहेत।`;
-      return `You've saved ₹${monthly.savings.toLocaleString("en-IN")} so far this month, from ${monthly.monthGeneratedKWh} kWh generated.`;
-    }
+
+    // 9. Carbon & Environment
     if (m.includes("co2") || m.includes("carbon") || m.includes("environment") || m.includes("पर्यावरण") || m.includes("पेड़") || m.includes("झाडे")) {
       if (isHi) return `आपने इस महीने लगभग ${monthly.co2AvoidedKg} किलो CO₂ बचाया है — जो प्रति वर्ष लगभग ${monthly.treesPerYear} पेड़ों के बराबर है।`;
       if (isMr) return `तुम्ही या महिन्यात सुमारे ${monthly.co2AvoidedKg} किलो CO₂ वाचवला आहे — जे प्रति वर्ष सुमारे ${monthly.treesPerYear} झाडांच्या बरोबरीचे आहे।`;
       return `You've avoided about ${monthly.co2AvoidedKg} kg of CO₂ this month — roughly equivalent to ${monthly.treesPerYear} trees over a year.`;
     }
+
+    // 10. System Health
     if (m.includes("health") || m.includes("status") || m.includes("ok") || m.includes("fine") || m.includes("आरोग्य") || m.includes("स्थिति") || m.includes("ठीक")) {
       if (scenario.id === "normal") {
         if (isHi) return "आपका सिस्टम स्वस्थ है — उत्पादन अपेक्षित वक्र के करीब चल रहा है।";
@@ -212,6 +297,8 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
       const body = isHi ? INSIGHT_TRANSLATIONS.hi[scenario.id]?.body : isMr ? INSIGHT_TRANSLATIONS.mr[scenario.id]?.body : scenario.insight.body;
       return `${title}: ${body}`;
     }
+
+    // 11. Default Fallbacks
     if (isHi) return "मैं आपके सौर उत्पादन, बचत, CO₂ प्रभाव, सिस्टम स्वास्थ्य या उपकरण चलाने के सही समय के बारे में प्रश्नों के उत्तर दे सकता हूँ।";
     if (isMr) return "मी तुमच्या सौर निर्मिती, बचत, CO₂ प्रभाव, प्रणालीचे आरोग्य किंवा उपकरणे चालवण्याच्या सर्वोत्तम वेळेबद्दलच्या प्रश्नांची उत्तरे देऊ शकतो।";
     return "I can answer questions about your generation, savings, CO₂ impact, system health, or when to run appliances — try asking one of those.";
