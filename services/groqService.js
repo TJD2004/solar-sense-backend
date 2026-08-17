@@ -166,14 +166,14 @@ export async function analyzePerformance({ scenario, healthScore, curve, lang })
 // --- /api/ai/chat ---
 export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
   const m = message.toLowerCase();
-  const { curve, monthly, scenario, healthScore } = ctx;
+  const { curve, monthly, scenario, healthScore, live } = ctx;
   const isHi = lang === "hi";
   const isMr = lang === "mr";
 
   const heuristicReply = (() => {
-    // 1. Table / Schedule
+    // 1. Table / Schedule Matrix
     if (m.includes("table") || m.includes("breakdown") || m.includes("appliance") || m.includes("schedule") || 
-        m.includes("सारणी") || m.includes("सूची") || m.includes("वेळापत्रक")) {
+        m.includes("whole day") || m.includes("matrix") || m.includes("सारणी") || m.includes("सूची") || m.includes("वेळापत्रक") || m.includes("शेड्यूल")) {
       if (isHi) {
         return `यहाँ आपकी अनुशंसित सौर उपकरण शेड्यूलिंग तालिका है:
 
@@ -201,9 +201,21 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
 | Water Heater Pump | 14:00 - 15:00 | ₹34.00 | Scheduled |`;
     }
 
-    // 2. Battery / Storage
-    if (m.includes("battery") || m.includes("storage") || m.includes("charge") || 
-        m.includes("बैटरी") || m.includes("बॅटरी") || m.includes("भंडारण") || m.includes("साठवण")) {
+    // 2. Battery Storage / Remaining Charge / State of Charge (e.g. "how much charging is left", "battery status")
+    if (m.includes("battery") || m.includes("storage") || m.includes("charg") || m.includes("bess") || m.includes("soc") ||
+        m.includes("बैटरी") || m.includes("बॅटरी") || m.includes("भंडारण") || m.includes("साठवण") || m.includes("चार्ज")) {
+      const battPct = live?.battery ?? 76;
+      const battPwr = live?.battPower ?? 1.18;
+      
+      // If user asks how much charge is left / battery percentage / current status
+      if (m.includes("left") || m.includes("remain") || m.includes("much") || m.includes("percent") || m.includes("level") || m.includes("status") || m.includes("now") || m.includes("current") || m.includes("बाकी") || m.includes("किती") || m.includes("कितना") || m.includes("स्थिती")) {
+        const flowText = battPwr > 0 ? `+${battPwr} kW charging with solar surplus` : battPwr < 0 ? `${Math.abs(battPwr)} kW discharging for home load` : "idle";
+        if (isHi) return `आपकी सौर बैटरी (BESS) वर्तमान में **${battPct}%** चार्ज है (${battPwr > 0 ? `अतिरिक्त सौर ऊर्जा से +${battPwr} kW चार्ज हो रही है` : battPwr < 0 ? `घर के लोड के लिए ${Math.abs(battPwr)} kW डिस्चार्ज हो रही है` : "सक्रिय"}).`;
+        if (isMr) return `तुमची सौर बॅटरी (BESS) सध्या **${battPct}%** चार्ज आहे (${battPwr > 0 ? `अतिरिक्त सौर ऊर्जेतून +${battPwr} kW चार्ज होत आहे` : battPwr < 0 ? `घराच्या वापरासाठी ${Math.abs(battPwr)} kW डिस्चार्ज होत आहे` : "सक्रिय"}).`;
+        return `Your solar battery (BESS) is currently at **${battPct}%** capacity (${flowText}).`;
+      }
+
+      // If user asks about battery optimization / longevity / depth of discharge
       if (isHi) {
         return "सौर बैटरी का जीवनकाल और प्रदर्शन बढ़ाने के लिए:\n\n1. **सर्वोत्तम चार्जिंग**: बैटरी को चरम सौर उत्पादन घंटों (**11:00 - 14:00**) के दौरान चार्ज करें।\n2. **डिस्चार्ज की सीमा (DoD)**: अपनी बैटरी को **20% से 80%** के बीच रखें, इससे बैटरी का जीवन दोगुना हो जाएगा।\n3. **पीक टैरिफ डिस्चार्ज**: महंगे ग्रिड टैरिफ से बचने के लिए शाम के पीक घंटों (**18:00 - 21:00**) में संचित ऊर्जा का उपयोग करें।";
       }
@@ -213,8 +225,8 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
       return "To maximize your solar battery lifespan and performance:\n\n1. **Optimal Charging**: Charge your battery during peak solar production hours (**11:00 - 14:00**) when generation exceeds household load.\n2. **Depth of Discharge (DoD)**: Maintain your battery state of charge between **20% and 80%** to double its total cycle life.\n3. **Peak Tariff Discharge**: Discharge stored battery energy during evening peak hours (**18:00 - 21:00**) to avoid expensive grid tariffs.";
     }
 
-    // 3. EV Charging
-    if (m.includes("ev") || m.includes("car") || m.includes("गाड़ी") || m.includes("गाडी") || m.includes("वाहन")) {
+    // 3. EV Charging Time
+    if (m.includes("ev") || m.includes("car") || m.includes("vehicle") || m.includes("गाड़ी") || m.includes("गाडी") || m.includes("वाहन")) {
       const rec = recommendWindow(curve, 2, 3.3);
       if (isHi) {
         return `आपकी इलेक्ट्रिक गाड़ी को चार्ज करने का सर्वोत्तम समय आज **${rec.window}** है। इस समय चार्ज करने से आप सीधे अतिरिक्त सौर उत्पादन का उपयोग करेंगे, जिससे लगभग **${rec.reductionKWh} kWh** ग्रिड बिजली की बचत होगी।`;
@@ -226,7 +238,7 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
     }
 
     // 4. AC Usage
-    if (m.includes("ac") || m.includes("air cond") || m.includes("एसी") || m.includes("कूलर")) {
+    if (m.includes("ac") || m.includes("air cond") || m.includes("cooler") || m.includes("एसी") || m.includes("कूलर")) {
       const rec = recommendWindow(curve, 3, 2.0);
       if (isHi) {
         return `एसी चलाने का सर्वोत्तम समय आज **${rec.window}** है, जब धूप सबसे तेज होती है और पर्याप्त सौर ऊर्जा उपलब्ध होती है। इस समय एसी चलाने से आप लगभग **${rec.reductionKWh} kWh** ग्रिड बिजली बचाएंगे।`;
@@ -237,9 +249,61 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
       return `The best window to run your Air Conditioner today is **${rec.window}** when solar production is at peak, saving approximately **${rec.reductionKWh} kWh** of grid draw.`;
     }
 
-    // 5. Monthly Generation & Savings
-    if (m.includes("month") || m.includes("save") || m.includes("saving") || m.includes("money") || m.includes("bill") ||
-        m.includes("महीना") || m.includes("महिना") || m.includes("बचत") || m.includes("पैसे") || m.includes("बिल")) {
+    // 5. Live Solar Generation Telemetry
+    if (m.includes("solar") || m.includes("generation") || m.includes("produce") || m.includes("producing") || m.includes("output") || m.includes("उत्पादन") || m.includes("निर्मिती")) {
+      const solVal = live?.solar ?? 4.72;
+      const todayTotal = ctx.dailyKWh ?? 24.5;
+      if (isHi) return `सोलर पैनल अभी **${solVal} kW** ऊर्जा बना रहे हैं (आज कुल अपेक्षित उत्पादन: **${todayTotal} kWh**)।`;
+      if (isMr) return `सौर पॅनेल्स सध्या **${solVal} kW** वीज निर्माण करत आहेत (आजचे एकूण अपेक्षित उत्पादन: **${todayTotal} kWh**)।`;
+      return `Your solar array is currently generating **${solVal} kW** (today's projected total is **${todayTotal} kWh**).`;
+    }
+
+    // 6. Live Household Consumption / Load
+    if (m.includes("load") || m.includes("consumption") || m.includes("home") || m.includes("use") || m.includes("usage") || m.includes("draw") || m.includes("खपत") || m.includes("वापर") || m.includes("खर्च")) {
+      const loadVal = live?.home ?? 2.10;
+      if (isHi) return `आपके घर का वर्तमान बिजली लोड **${loadVal} kW** है।`;
+      if (isMr) return `तुमच्या घराचा सध्याचा वीज लोड **${loadVal} kW** आहे।`;
+      return `Your home is currently consuming **${loadVal} kW** of electrical load.`;
+    }
+
+    // 7. Live Grid Export / Import / Net Metering
+    if (m.includes("grid") || m.includes("import") || m.includes("export") || m.includes("net meter") || m.includes("feed") || m.includes("ग्रिड") || m.includes("महावितरण")) {
+      const gridVal = live?.grid ?? 0.0;
+      const netVal = live?.gridNet ?? 0.0;
+      if (isHi) return `ग्रिड स्थिति: वर्तमान ग्रिड आयात **${gridVal} kW** है (नेट ग्रिड प्रवाह: **${netVal > 0 ? `+${netVal} kW निर्यात` : `${netVal} kW आयात`}**)।`;
+      if (isMr) return `ग्रिड स्थिती: सध्या ग्रिड आयात **${gridVal} kW** आहे (नेट ग्रिड प्रवाह: **${netVal > 0 ? `+${netVal} kW निर्यात` : `${netVal} kW आयात`}**)।`;
+      return `Grid status: Grid import is currently **${gridVal} kW** (net flow is **${netVal >= 0 ? `+${netVal} kW exporting` : `${netVal} kW importing`}**).`;
+    }
+
+    // 8. Inverter & Electrical Telemetry (Voltage, Frequency, Efficiency)
+    if (m.includes("inverter") || m.includes("voltage") || m.includes("frequency") || m.includes("efficiency") || m.includes("volt") || m.includes("इन्वर्टर") || m.includes("वोल्टेज") || m.includes("दक्षता")) {
+      const volt = live?.acVoltage ?? 230.0;
+      const freq = live?.acFrequency ?? 50.0;
+      const eff = live?.efficiency ?? 98.2;
+      if (isHi) return `इन्वर्टर टेलीमेट्री: एसी वोल्टेज **${volt} V**, आवृत्ति **${freq} Hz**, और परिचालन दक्षता **${eff}%** पर सामान्य रूप से काम कर रही है।`;
+      if (isMr) return `इन्व्हर्टर टेलीमेट्री: एसी व्होल्टेज **${volt} V**, वारंवारता **${freq} Hz**, आणि कार्यक्षमता **${eff}%** वर स्थिर चालू आहे।`;
+      return `Inverter Telemetry: AC Voltage is **${volt} V**, Frequency is **${freq} Hz**, and Inverter Efficiency is **${eff}%**.`;
+    }
+
+    // 9. Weather, Irradiance & Temperature
+    if (m.includes("irradiance") || m.includes("sun") || m.includes("weather") || m.includes("temp") || m.includes("heat") || m.includes("धूप") || m.includes("मौसम") || m.includes("तापमान") || m.includes("हवामान")) {
+      const irr = live?.irradiance ?? 820;
+      const temp = live?.panelTemp ?? 32.4;
+      if (isHi) return `मौसम और तापमान: सौर विकिरण **${irr} W/m²** है और पैनल का तापमान **${temp}°C** पर अनुकूल है।`;
+      if (isMr) return `हवामान आणि तापमान: सौर विकिरण **${irr} W/m²** आहे आणि पॅनेलचे तापमान **${temp}°C** वर योग्य आहे।`;
+      return `Weather & Thermal Field: Solar Irradiance is **${irr} W/m²** and Panel Temperature is **${temp}°C**.`;
+    }
+
+    // 10. Forecast / Tomorrow / Future Generation
+    if (m.includes("forecast") || m.includes("tomorrow") || m.includes("future") || m.includes("predict") || m.includes("कल") || m.includes("उद्या") || m.includes("अंदाज")) {
+      if (isHi) return `कल का सौर पूर्वानुमान: अनुकूल मौसम और उच्च विकिरण के साथ कल लगभग **41.8 kWh** उत्पादन होने की उम्मीद है।`;
+      if (isMr) return `उद्याचा सौर अंदाज: चांगल्या सूर्यप्रकाशामुळे उद्या सुमारे **41.8 kWh** निर्मिती अपेक्षित आहे।`;
+      return `Solar Yield Forecast: Tomorrow is projected to generate approximately **41.8 kWh** under high solar irradiance.`;
+    }
+
+    // 11. Monthly Generation & Savings
+    if (m.includes("month") || m.includes("save") || m.includes("saving") || m.includes("money") || m.includes("bill") || m.includes("cost") || m.includes("tariff") ||
+        m.includes("महीना") || m.includes("महिना") || m.includes("बचत") || m.includes("पैसे") || m.includes("बिल") || m.includes("रुपये")) {
       if (isHi) {
         return `आपने इस महीने अब तक **${monthly.monthGeneratedKWh} kWh** सौर ऊर्जा का उत्पादन किया है, जिससे कुल **₹${monthly.savings.toLocaleString("en-IN")}** की बचत हुई है!`;
       }
@@ -249,7 +313,7 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
       return `So far this month, your solar system has generated **${monthly.monthGeneratedKWh} kWh**, saving you **₹${monthly.savings.toLocaleString("en-IN")}** on your electricity bill and avoiding **${monthly.co2AvoidedKg} kg** of CO₂ emissions.`;
     }
 
-    // 6. Panel Maintenance & Cleaning
+    // 12. Panel Maintenance & Cleaning
     if (m.includes("clean") || m.includes("dust") || m.includes("soiling") || m.includes("maintenance") ||
         m.includes("साफ") || m.includes("सफाई") || m.includes("धूल")) {
       if (isHi) return "धूल और गंदगी सौर अवशोषण को 12% से 25% तक कम कर सकती है। हम आपके सौर पैनलों को हर 3 से 4 सप्ताह में एक बार सुबह जल्दी साफ पानी और एक नरम निचोड़ के साथ साफ करने की सलाह देते हैं।";
@@ -257,54 +321,39 @@ export async function chatWithCopilot({ message, ctx, recommendWindow, lang }) {
       return "Dust, bird droppings, and soiling can reduce solar absorption by 12% to 25%. We recommend cleaning your solar panels with clean water and a soft squeegee once every 3 to 4 weeks early in the morning before panels get hot.";
     }
 
-    // 7. Yesterday/Anomalies
-    if (m.includes("yesterday") || m.includes("bad") || m.includes("wrong") || m.includes("why") || 
-        m.includes("कल") || m.includes("काल") || m.includes("खराब") || m.includes("का") || m.includes("क्यों") || m.includes("काय")) {
-      if (scenario.id === "normal") {
-        if (isHi) return "कल उत्पादन अपेक्षित वक्र के करीब था — कोई गिरावट नहीं देखी गई।";
-        if (isMr) return "काल निर्मिती अपेक्षित वक्राच्या जवळ होती — कोणतीही घट आढळली नाही।";
-        return "Yesterday tracked the expected curve closely — no notable dip.";
-      }
-      if (isHi) return INSIGHT_TRANSLATIONS.hi[scenario.id]?.body || scenario.insight.body;
-      if (isMr) return INSIGHT_TRANSLATIONS.mr[scenario.id]?.body || scenario.insight.body;
-      return scenario.insight.body;
-    }
-
-    // 8. General Appliance Wash/Run Queries
-    if (m.includes("wash") || m.includes("run") || m.includes("now") || m.includes("should i") || 
-        m.includes("कपड़े") || m.includes("चला") || m.includes("कपडे") || m.includes("चालू")) {
-      const rec = recommendWindow(curve, 1, 1.2);
-      if (isHi) return `आज सबसे अच्छा सौर समय ${rec.window} है — उस समय ~1.2 kW उपकरण चलाने से ग्रिड से लगभग ${rec.reductionKWh} kWh की खपत कम होगी।`;
-      if (isMr) return `आजची सर्वोत्तम सौर वेळ ${rec.window} आहे — त्या वेळी ~1.2 kW उपकरणे चालवल्यास ग्रिडवरील वापर सुमारे ${rec.reductionKWh} kWh कमी होईल।`;
-      return `The best solar window today is ${rec.window} — running a ~1.2 kW appliance then would cut roughly ${rec.reductionKWh} kWh of grid draw.`;
-    }
-
-    // 9. Carbon & Environment
-    if (m.includes("co2") || m.includes("carbon") || m.includes("environment") || m.includes("पर्यावरण") || m.includes("पेड़") || m.includes("झाडे")) {
+    // 13. Carbon & Environment
+    if (m.includes("co2") || m.includes("carbon") || m.includes("environment") || m.includes("tree") || m.includes("green") || m.includes("पर्यावरण") || m.includes("पेड़") || m.includes("झाडे")) {
       if (isHi) return `आपने इस महीने लगभग ${monthly.co2AvoidedKg} किलो CO₂ बचाया है — जो प्रति वर्ष लगभग ${monthly.treesPerYear} पेड़ों के बराबर है।`;
       if (isMr) return `तुम्ही या महिन्यात सुमारे ${monthly.co2AvoidedKg} किलो CO₂ वाचवला आहे — जे प्रति वर्ष सुमारे ${monthly.treesPerYear} झाडांच्या बरोबरीचे आहे।`;
       return `You've avoided about ${monthly.co2AvoidedKg} kg of CO₂ this month — roughly equivalent to ${monthly.treesPerYear} trees over a year.`;
     }
 
-    // 10. System Health
-    if (m.includes("health") || m.includes("status") || m.includes("ok") || m.includes("fine") || m.includes("आरोग्य") || m.includes("स्थिति") || m.includes("ठीक")) {
+    // 14. System Health & Anomalies
+    if (m.includes("health") || m.includes("status") || m.includes("ok") || m.includes("fine") || m.includes("yesterday") || m.includes("fault") || m.includes("problem") || m.includes("आरोग्य") || m.includes("स्थिति") || m.includes("खराबी")) {
       if (scenario.id === "normal") {
-        if (isHi) return "आपका सिस्टम स्वस्थ है — उत्पादन अपेक्षित वक्र के करीब चल रहा है।";
-        if (isMr) return "तुमची प्रणाली निरोगी आहे — निर्मिती अपेक्षित वक्राच्या जवळ चालू आहे।";
-        return "Your system is healthy — production is tracking close to the expected curve.";
+        if (isHi) return `आपका सिस्टम **${healthScore}/100** स्कोर के साथ पूरी तरह स्वस्थ है और उत्पादन अपेक्षित वक्र के करीब चल रहा है।`;
+        if (isMr) return `तुमची प्रणाली **${healthScore}/100** स्कोरसह निरोगी आहे आणि निर्मिती अपेक्षित वक्राच्या जवळ चालू आहे।`;
+        return `Your system is fully healthy with a **${healthScore}/100** health score — production is tracking the clear-sky curve.`;
       }
       const title = isHi ? INSIGHT_TRANSLATIONS.hi[scenario.id]?.title : isMr ? INSIGHT_TRANSLATIONS.mr[scenario.id]?.title : scenario.insight.title;
       const body = isHi ? INSIGHT_TRANSLATIONS.hi[scenario.id]?.body : isMr ? INSIGHT_TRANSLATIONS.mr[scenario.id]?.body : scenario.insight.body;
       return `${title}: ${body}`;
     }
 
-    // 11. Default Fallbacks
-    if (isHi) return "मैं आपके सौर उत्पादन, बचत, CO₂ प्रभाव, सिस्टम स्वास्थ्य या उपकरण चलाने के सही समय के बारे में प्रश्नों के उत्तर दे सकता हूँ।";
-    if (isMr) return "मी तुमच्या सौर निर्मिती, बचत, CO₂ प्रभाव, प्रणालीचे आरोग्य किंवा उपकरणे चालवण्याच्या सर्वोत्तम वेळेबद्दलच्या प्रश्नांची उत्तरे देऊ शकतो।";
-    return "I can answer questions about your generation, savings, CO₂ impact, system health, or when to run appliances — try asking one of those.";
+    // 15. Intelligent Live System Overview Fallback
+    const solNow = live?.solar ?? 4.72;
+    const loadNow = live?.home ?? 2.10;
+    const battNow = live?.battery ?? 76;
+    if (isHi) {
+      return `सोलर सिस्टम की वर्तमान स्थिति: सौर उत्पादन **${solNow} kW**, घर का लोड **${loadNow} kW**, बैटरी **${battNow}%**, और स्वास्थ्य स्कोर **${healthScore}/100** है। आप सौर उत्पादन, बैटरी चार्ज, बचत, पूर्वानुमान या उपकरण शेड्यूलिंग के बारे में कुछ भी पूछ सकते हैं!`;
+    }
+    if (isMr) {
+      return `सोलर सिस्टीमची सद्यस्थिती: सौर निर्मिती **${solNow} kW**, घराचा लोड **${loadNow} kW**, बॅटरी **${battNow}%**, आणि आरोग्य स्कोर **${healthScore}/100** आहे। तुम्ही सौर उत्पादन, बॅटरी चार्ज, बचत, अंदाज किंवा उपकरणे चालवण्याबद्दल कोणताही प्रश्न विचारू शकता!`;
+    }
+    return `Here is your live SolarSense status: Solar generation is **${solNow} kW**, home load is **${loadNow} kW**, battery storage is at **${battNow}%**, and today's health score is **${healthScore}/100**. Ask any question about your solar telemetry, battery charge, savings, or appliance scheduling!`;
   })();
 
-  const dataSummary = `Health score: ${healthScore}/100. Scenario: ${scenario.label}. Month generated: ${monthly.monthGeneratedKWh} kWh. Savings so far: ₹${monthly.savings}. CO2 avoided: ${monthly.co2AvoidedKg} kg (~${monthly.treesPerYear} trees/yr). Scenario insight: ${scenario.insight.body}`;
+  const dataSummary = `Health score: ${healthScore}/100. Scenario: ${scenario.label}. Month generated: ${monthly.monthGeneratedKWh} kWh. Savings so far: ₹${monthly.savings}. CO2 avoided: ${monthly.co2AvoidedKg} kg (~${monthly.treesPerYear} trees/yr). Scenario insight: ${scenario.insight.body}. Live Telemetry: solar output is ${live?.solar ?? 0} kW, home load is ${live?.home ?? 0} kW, battery charge is ${live?.battery ?? 0}%, battery flow is ${live?.battPower ?? 0} kW, grid draw is ${live?.grid ?? 0} kW, grid net is ${live?.gridNet ?? 0} kW, panel temp is ${live?.panelTemp ?? 0}°C, irradiance is ${live?.irradiance ?? 0} W/m², AC voltage is ${live?.acVoltage ?? 230} V, AC freq is ${live?.acFrequency ?? 50} Hz, inverter efficiency is ${live?.efficiency ?? 98}%.`;
 
   const langPrompt = isHi
     ? "Respond ONLY in Hindi (हिंदी). Translate all calculations and insights naturally into Hindi."

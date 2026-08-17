@@ -47,6 +47,9 @@ export async function chat(req, res) {
     monthly: twin.getMonthly(),
     scenario: twin.getScenarioDef(),
     healthScore: twin.getHealth(),
+    live: twin.getLiveSnapshot(),
+    dailyKWh: twin.getDailyKWh(),
+    overrides: twin.overrides,
   };
 
   const result = await chatWithCopilot({ message, ctx, recommendWindow, lang });
