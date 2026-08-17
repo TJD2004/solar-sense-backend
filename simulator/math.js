@@ -264,14 +264,14 @@ export function deriveHealthScore(curve) {
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function forecastNextHours(now = new Date()) {
-  const curve = buildTodayCurve("normal");
+export function forecastNextHours(now = new Date(), overrides = {}) {
+  const curve = buildTodayCurve("normal", overrides);
   const currentHour = now.getHours();
   return curve.filter((p) => parseInt(p.hour, 10) >= currentHour).map((p) => ({ hour: p.hour, expected: p.expected }));
 }
 
-export function forecastTomorrowKWh() {
-  const curve = buildTodayCurve("normal");
+export function forecastTomorrowKWh(overrides = {}) {
+  const curve = buildTodayCurve("normal", overrides);
   return +curve.reduce((s, p) => s + p.expected, 0).toFixed(1);
 }
 
